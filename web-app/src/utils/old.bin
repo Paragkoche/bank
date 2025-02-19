@@ -1,0 +1,413 @@
+import axios from "axios";
+import { ElementHandle, Page } from "puppeteer";
+import { Cluster } from "puppeteer-cluster";
+import { bodyDtoType } from "../dto/masterFrom";
+
+export const getData = async (data: bodyDtoType) => {
+  const cluster = await Cluster.launch({
+    concurrency: Cluster.CONCURRENCY_PAGE,
+    maxConcurrency: 8,
+    timeout: 60 * 1000,
+    puppeteerOptions: {
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
+    },
+  });
+  await cluster.task(async ({ page, data }) => {
+    await page.setRequestInterception(true);
+    page.on("request", (req) => {
+      if (["image", "stylesheet", "font"].includes(req.resourceType())) {
+        req.abort();
+      } else {
+        req.continue();
+      }
+    });
+
+    await page.setUserAgent(
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0.0.0 Safari/537.36"
+    );
+
+    await page.evaluateOnNewDocument(() => {
+      Object.defineProperty(navigator, "webdriver", { get: () => false });
+    });
+
+    await page.goto(data.url, { waitUntil: "networkidle2" });
+
+    // ✅ Wait for input fields to appear
+    await page.waitForSelector(data.waitSelector, { visible: true });
+
+    if (!data.stepper) {
+      // 🔹 Enter Data in Fields
+      for (const field of data.inputs) {
+        const inputElement = await page.$(field.selector);
+        if (inputElement) {
+          await inputElement.click({ clickCount: 3 }); // Select existing text
+          await page.keyboard.press("Backspace"); // Clear field
+          await inputElement.type(field.value); // Enter data
+          // console.log(`Entered "${field.value}" into ${field.selector}`);
+        } else {
+          console.log(`❌ Input field not found: ${field.selector}`);
+        }
+      }
+    }
+    await data.getData(page);
+  });
+  // await page.screenshot({
+  //   fullPage: true,
+  //   path: "D:/image.png",
+  // });
+
+  async function anz(data: bodyDtoType) {
+    return await cluster.queue({
+      stepper: false,
+      url: "https://www.anz.com.au/personal/home-loans/calculators-tools/borrowing-power-calculator/",
+      waitSelector: "input",
+      inputs: [
+        { selector: "#expenses", value: data.expenses.toString() },
+        {
+          selector: "input[aria-labelledby='q2q1']",
+          value: data.earn.toString(),
+        },
+      ],
+      async getData(page: Page) {
+        console.log(
+          "====================================================ANZ====================================================================="
+        );
+
+        let btn = await page.$("#btnBorrowCalculater");
+        if (btn) {
+          await btn.click();
+        } else {
+          // console.log("❌ Calculate button not found!");
+          return;
+        }
+
+        // ✅ Wait for the aria-live attribute to become "assertive"
+        await page.waitForFunction(() => {
+          let resultElement = document.querySelector(".borrow__result__text");
+          return resultElement?.getAttribute("aria-live") === "assertive";
+        });
+
+        // ✅ Extract the result
+        try {
+          let result = await page.$eval("#borrowResultTextAmount", (el) =>
+            el.textContent?.trim()
+          );
+          return result;
+        } catch (error) {
+          console.error("Error fetching result:", error);
+        }
+      },
+    });
+  }
+  async function cba(data: bodyDtoType) {
+    return await cluster.queue({
+      stepper: false,
+
+      url: "https://www.commbank.com.au/digital/home-loans/calculator/how-much-can-i-borrow",
+      waitSelector: ".question-form",
+      inputs: [
+        { selector: "#income", value: data.earn.toString() },
+        {
+          selector: "#expense-living",
+          value: data.expenses.toString(), // par week
+        },
+      ],
+      async getData(page: Page) {
+        console.log(
+          "====================================================Commbank====================================================================="
+        );
+        let btn = await page.$("#button-calculate");
+        if (btn) {
+          await btn.click();
+        } else {
+          console.log("❌ Calculate button not found!");
+          return;
+        }
+
+        // ✅ Wait for the result to appear
+        await page.waitForSelector(".capacity-text", { visible: true });
+
+        // ✅ Extract and clean the result
+        try {
+          let resultText = await page.$eval(
+            ".capacity-text",
+            (el) => el.textContent?.trim() || ""
+          );
+
+          // ✅ Remove any non-numeric or non-currency text
+          let result = resultText.replace(/[^\d$,]/g, "").trim();
+
+          return result;
+        } catch (error) {
+          console.error("Error fetching result:", error);
+        }
+      },
+    });
+  }
+
+  async function westpac(data: bodyDtoType) {
+    return await axios
+      .get("https://digital-api.stgeorge.com.au/calc/bp", {
+        params: {
+          rateType: "SPL1",
+          rateCode: "HLFR150",
+          postcode: data.postcode.toString(),
+          numberOfDependents: "0",
+          prdCode: "To+live+in",
+          baseIncome: data.earn.toString(),
+          baseIncomeFrequency: "ANNUAL",
+          rentalIncomeFrequency: "ANNUAL",
+          overtimeBonusIncomeFrequency: "ANNUAL",
+          basicHouseholdExpenses: data.expenses.toString(),
+          basicHouseholdExpensesFrequency: "MONTHLY",
+          additionalExpensesFrequency: "MONTHLY",
+          investmentPropertyExpensesFrequency: "MONTHLY",
+          homeLoanRepaymentFrequency: "MONTHLY",
+          investmentHomeLoanRepaymentFrequency: "MONTHLY",
+          personalLoanRepaymentFrequency: "MONTHLY",
+          bank: "WBC",
+          loanTerm: "30",
+          portfolio: "HL",
+          productCode: "FlexiFirstOptionHomeLoan",
+          jointLoanApp: "false",
+        },
+      })
+      .then(({ data }) => {
+        console.log(
+          "====================================================Macquarie Bank====================================================================="
+        );
+        // console.log(data);
+
+        console.log(data.data.serviceability.value);
+        return data.data.serviceability.value;
+      });
+  }
+  function macquarie_bank() {
+    return "$150,000";
+  }
+  async function nab(data: bodyDtoType) {
+    return cluster.queue({
+      stepper: true,
+      url: "https://www.nab.com.au/personal/home-loans/calculators/borrowing-calculator",
+      waitSelector: "mini-app-loader",
+      async getData(page: Page) {
+        console.log(
+          "====================================================nab====================================================================="
+        );
+        const shadowHost = await page.waitForSelector(
+          "borrowing-power-calculator-web"
+        );
+        const shadowRoot = (await page.evaluateHandle(
+          (el) => el && el.shadowRoot,
+          shadowHost
+        )) as ElementHandle<ShadowRoot>;
+
+        // Click "Income" Button
+        const buttons = await shadowRoot.$$("button");
+        for (let i of buttons) {
+          const text = await page.evaluate((el) => el.innerText, i);
+          if (text.includes("Income")) {
+            await i.click();
+            break;
+          }
+        }
+
+        // Enter Income Amount
+        const inputElement = await shadowRoot.$("#incomeAmount");
+        if (inputElement) {
+          await inputElement.click({ clickCount: 3 });
+          await page.keyboard.press("Backspace");
+          await inputElement.type(data.earn.toString());
+        }
+
+        // Click "Next" Button
+        const buttons2 = await shadowRoot.$$("button");
+        for (let i of buttons2) {
+          const text = await page.evaluate((el) => el.innerText, i);
+          if (text.includes("Next")) {
+            await i.click();
+            break;
+          }
+        }
+
+        // Enter Bills & Expenses
+        const inputElement2 = await shadowRoot.$("#billsExpenses");
+        if (inputElement2) {
+          await inputElement2.click({ clickCount: 3 });
+          await page.keyboard.press("Backspace");
+          await inputElement2.type(data.expenses.toString());
+        }
+
+        // Click "View Results" Button
+        const buttons3 = await shadowRoot.$$("button");
+        for (let i of buttons3) {
+          const text = await page.evaluate((el) => el.innerText, i);
+          if (text.includes("View results")) {
+            await i.click();
+            break;
+          }
+        }
+
+        // **Wait for the input field to be removed**
+        await page.waitForFunction(() => {
+          return !document
+            .querySelector("borrowing-power-calculator-web")
+            ?.shadowRoot?.querySelector("input#borrowingAmount");
+        });
+
+        // **Wait for the input field to reappear**
+        await page.waitForFunction(() => {
+          return document
+            .querySelector("borrowing-power-calculator-web")
+            ?.shadowRoot?.querySelector("input#borrowingAmount");
+        });
+
+        // **Wait until the value is updated (not $0)**
+        // await page.waitForFunction(() => {
+        //   const input: any = document
+        //     .querySelector("borrowing-power-calculator-web")
+        //     ?.shadowRoot?.querySelector("input#borrowingAmount");
+        //   return input && input.value !== "$0";
+        // });
+
+        // **Re-query the shadowRoot and get the updated value**
+        const newShadowRoot = (await page.evaluateHandle(
+          (el) => el && el.shadowRoot,
+          shadowHost
+        )) as ElementHandle<ShadowRoot>;
+
+        const borrowingAmount = await newShadowRoot.$eval(
+          "input#borrowingAmount",
+          (el) => el.value
+        );
+        console.log("Final Borrowing Amount:", borrowingAmount);
+        return borrowingAmount;
+      },
+    });
+  }
+  async function boq(data: bodyDtoType) {
+    return await cluster.queue({
+      url: "https://www.boq.com.au/personal/tools-and-calculators/borrowing-power-calculator",
+      waitSelector: "main",
+      stepper: true,
+      async getData(page: Page) {
+        console.log(
+          "====================================================BOQ====================================================================="
+        );
+
+        // console.log(
+        //   await page.$$eval("#calculator-container", (el) =>
+        //     el.map((v) => ({ html: v.innerHTML, id: v.id }))
+        //   )
+        // );
+
+        await page.waitForSelector("#calculator-container");
+
+        // console.log(await shadowRoot.$$eval("input", (v) => v.map((v) => v.id)));
+        let inputElement = await page.$(
+          "input#borrowerDtl\\[0\\]\\.borrowerIncomeDtl\\[0\\]\\.amount"
+        );
+
+        if (inputElement) {
+          await inputElement.click({ clickCount: 3 });
+          await page.keyboard.press("Backspace");
+          await inputElement.type((data.earn / 52).toFixed(3).toString());
+          // console.log(`Entered "amount" into 1000`);
+        }
+        inputElement = await page.$(
+          "input#hasborrowerDtl\\[0\\]\\.borrowerIncomeDtl-no-1"
+        );
+
+        if (inputElement) {
+          await inputElement.click({ clickCount: 3 });
+
+          // console.log(`Entered "amount" into 1000`);
+        }
+
+        let inputElement2 = await page.$("label[for='borrowType-just-me-0']");
+        // console.log(await inputElement?.$("")); //undefined
+
+        if (inputElement2) {
+          await inputElement2.scrollIntoView();
+          await inputElement2.click();
+
+          // console.log(`Entered "amount" into 1000`);
+        }
+        let btn = await page.$("button[type='submit'].boqc-cta.arrow.false");
+
+        // console.log(btn);
+
+        if (btn) {
+          await btn.scrollIntoView();
+          await btn.click();
+        }
+        await page.waitForSelector("#calculator-container");
+        inputElement = await page.$("input#hasDependents-no-1");
+        if (inputElement) {
+          await inputElement.click({ clickCount: 3 });
+
+          // console.log(`Entered "amount" into 1000`);
+        }
+        let inputElement3 = await page.$(
+          "label[for='hasotherLoanRepayDtl-no-1']"
+        );
+        if (inputElement3) {
+          await inputElement3.click({ clickCount: 3 });
+
+          // console.log(`Entered "amount" into 1000`);
+        }
+        inputElement3 = await page.$("label[for='hascreditStoreCard-no-1']");
+        if (inputElement3) {
+          await inputElement3.click({ clickCount: 3 });
+
+          // console.log(`Entered "amount" into 1000`);
+        }
+        let inputElement4 = await page.$(
+          "input#generalExpenseDtl\\[0\\]\\.amount"
+        );
+        if (inputElement4) {
+          await inputElement4.scrollIntoView();
+          await inputElement4.click({ clickCount: 3 });
+          await page.keyboard.press("Backspace");
+          await inputElement4.type((data.expenses / 4).toFixed(3).toString());
+          // console.log(`Entered "amount" into 1000`);
+        }
+        let btn2 = await page.$("button[type='submit'].boqc-cta.arrow.false");
+
+        // console.log(btn2);
+
+        if (btn2) {
+          await btn2.scrollIntoView();
+          await btn2.click();
+        }
+        await page.waitForSelector(
+          ".calculated-borrowing-power__borrowing-power"
+        );
+        const borrowingAmount = await page.$eval(
+          ".calculated-borrowing-power__borrowing-power",
+          (el) => el.innerHTML
+        );
+        console.log("Final Borrowing Amount:", borrowingAmount);
+        await page.waitForSelector(
+          ".calculated-borrowing-power__borrowing-power"
+        );
+        const borrowingRate = await page.$eval(
+          ".calculated-borrowing-power__interest-rate",
+          (el) => el.innerHTML
+        );
+        console.log("Final Borrowing Amount:", borrowingRate);
+        return borrowingAmount;
+      },
+    });
+  }
+  let anz_data = await anz(data);
+  return {
+    anz: anz_data,//
+    cba: await cba(data),//
+    westpac: await westpac(data),//
+    macquarie_bank: await macquarie_bank(),//
+    nab: await nab(data),
+    boq: await boq(data),
+  };
+};
