@@ -5,8 +5,8 @@ import { bodyDtoType } from "../dto/masterFrom";
 
 export const getData = async (data: bodyDtoType) => {
   const cluster = await Cluster.launch({
-    concurrency: Cluster.CONCURRENCY_PAGE,
-    maxConcurrency: 8,
+    concurrency: Cluster.CONCURRENCY_CONTEXT,
+    maxConcurrency: 16,
     timeout: 60000,
     puppeteerOptions: {
       headless: true,
@@ -100,208 +100,208 @@ export const getData = async (data: bodyDtoType) => {
     },
   });
 
-  await cluster.queue({
-    stepper: true,
-    bank: "nab",
-    url: "https://www.nab.com.au/personal/home-loans/borrowing-power-calculator",
-    waitSelector: "mini-app-loader",
-    async getData(page: Page) {
-      const shadowHost = await page.waitForSelector(
-        "borrowing-power-calculator-web"
-      );
-      const shadowRoot = (await page.evaluateHandle(
-        (el) => el && el.shadowRoot,
-        shadowHost
-      )) as ElementHandle<ShadowRoot>;
+  // await cluster.queue({
+  //   stepper: true,
+  //   bank: "nab",
+  //   url: "https://www.nab.com.au/personal/home-loans/borrowing-power-calculator",
+  //   waitSelector: "mini-app-loader",
+  //   async getData(page: Page) {
+  //     const shadowHost = await page.waitForSelector(
+  //       "borrowing-power-calculator-web"
+  //     );
+  //     const shadowRoot = (await page.evaluateHandle(
+  //       (el) => el && el.shadowRoot,
+  //       shadowHost
+  //     )) as ElementHandle<ShadowRoot>;
 
-      // Click "Income" Button
-      const buttons = await shadowRoot.$$("button");
-      for (let i of buttons) {
-        const text = await page.evaluate((el) => el.innerText, i);
-        if (text.includes("Income")) {
-          await i.click();
-          break;
-        }
-      }
+  //     // Click "Income" Button
+  //     const buttons = await shadowRoot.$$("button");
+  //     for (let i of buttons) {
+  //       const text = await page.evaluate((el) => el.innerText, i);
+  //       if (text.includes("Income")) {
+  //         await i.click();
+  //         break;
+  //       }
+  //     }
 
-      // Enter Income Amount
-      const inputElement = await shadowRoot.$("#incomeAmount");
-      if (inputElement) {
-        await inputElement.click({ clickCount: 3 });
-        await page.keyboard.press("Backspace");
-        await inputElement.type(data.earn.toString());
-      }
+  //     // Enter Income Amount
+  //     const inputElement = await shadowRoot.$("#incomeAmount");
+  //     if (inputElement) {
+  //       await inputElement.click({ clickCount: 3 });
+  //       await page.keyboard.press("Backspace");
+  //       await inputElement.type(data.earn.toString());
+  //     }
 
-      // Click "Next" Button
-      const buttons2 = await shadowRoot.$$("button");
-      for (let i of buttons2) {
-        const text = await page.evaluate((el) => el.innerText, i);
-        if (text.includes("Next")) {
-          await i.click();
-          break;
-        }
-      }
+  //     // Click "Next" Button
+  //     const buttons2 = await shadowRoot.$$("button");
+  //     for (let i of buttons2) {
+  //       const text = await page.evaluate((el) => el.innerText, i);
+  //       if (text.includes("Next")) {
+  //         await i.click();
+  //         break;
+  //       }
+  //     }
 
-      // Enter Bills & Expenses
-      const inputElement2 = await shadowRoot.$("#billsExpenses");
-      if (inputElement2) {
-        await inputElement2.click({ clickCount: 3 });
-        await page.keyboard.press("Backspace");
-        await inputElement2.type(data.expenses.toString());
-      }
+  //     // Enter Bills & Expenses
+  //     const inputElement2 = await shadowRoot.$("#billsExpenses");
+  //     if (inputElement2) {
+  //       await inputElement2.click({ clickCount: 3 });
+  //       await page.keyboard.press("Backspace");
+  //       await inputElement2.type(data.expenses.toString());
+  //     }
 
-      // Click "View Results" Button
-      const buttons3 = await shadowRoot.$$("button");
-      for (let i of buttons3) {
-        const text = await page.evaluate((el) => el.innerText, i);
-        if (text.includes("View results")) {
-          await i.click();
-          break;
-        }
-      }
+  //     // Click "View Results" Button
+  //     const buttons3 = await shadowRoot.$$("button");
+  //     for (let i of buttons3) {
+  //       const text = await page.evaluate((el) => el.innerText, i);
+  //       if (text.includes("View results")) {
+  //         await i.click();
+  //         break;
+  //       }
+  //     }
 
-      // **Wait for the input field to be removed**
-      await page.waitForFunction(() => {
-        return !document
-          .querySelector("borrowing-power-calculator-web")
-          ?.shadowRoot?.querySelector("input#borrowingAmount");
-      });
+  //     // **Wait for the input field to be removed**
+  //     await page.waitForFunction(() => {
+  //       return !document
+  //         .querySelector("borrowing-power-calculator-web")
+  //         ?.shadowRoot?.querySelector("input#borrowingAmount");
+  //     });
 
-      // **Wait for the input field to reappear**
-      await page.waitForFunction(() => {
-        return document
-          .querySelector("borrowing-power-calculator-web")
-          ?.shadowRoot?.querySelector("input#borrowingAmount");
-      });
+  //     // **Wait for the input field to reappear**
+  //     await page.waitForFunction(() => {
+  //       return document
+  //         .querySelector("borrowing-power-calculator-web")
+  //         ?.shadowRoot?.querySelector("input#borrowingAmount");
+  //     });
 
-      // **Wait until the value is updated (not $0)**
-      // await page.waitForFunction(() => {
-      //   const input: any = document
-      //     .querySelector("borrowing-power-calculator-web")
-      //     ?.shadowRoot?.querySelector("input#borrowingAmount");
-      //   return input && input.value !== "$0";
-      // });
+  //     // **Wait until the value is updated (not $0)**
+  //     // await page.waitForFunction(() => {
+  //     //   const input: any = document
+  //     //     .querySelector("borrowing-power-calculator-web")
+  //     //     ?.shadowRoot?.querySelector("input#borrowingAmount");
+  //     //   return input && input.value !== "$0";
+  //     // });
 
-      // **Re-query the shadowRoot and get the updated value**
-      const newShadowRoot = (await page.evaluateHandle(
-        (el) => el && el.shadowRoot,
-        shadowHost
-      )) as ElementHandle<ShadowRoot>;
+  //     // **Re-query the shadowRoot and get the updated value**
+  //     const newShadowRoot = (await page.evaluateHandle(
+  //       (el) => el && el.shadowRoot,
+  //       shadowHost
+  //     )) as ElementHandle<ShadowRoot>;
 
-      const borrowingAmount = await newShadowRoot.$eval(
-        "input#borrowingAmount",
-        (el) => el.value
-      );
-      console.log("Final Borrowing Amount:", borrowingAmount);
-      return borrowingAmount;
-    },
-  });
+  //     const borrowingAmount = await newShadowRoot.$eval(
+  //       "input#borrowingAmount",
+  //       (el) => el.value
+  //     );
+  //     console.log("Final Borrowing Amount:", borrowingAmount);
+  //     return borrowingAmount;
+  //   },
+  // });
 
-  await cluster.queue({
-    waitSelector: "main",
-    stepper: true,
-    bank: "boq",
-    url: "https://www.boq.com.au/home-loans/borrowing-power",
+  // await cluster.queue({
+  //   waitSelector: "main",
+  //   stepper: true,
+  //   bank: "boq",
+  //   url: "https://www.boq.com.au/home-loans/borrowing-power",
 
-    async getData(page: Page) {
-      await page.waitForSelector("#calculator-container");
+  //   async getData(page: Page) {
+  //     await page.waitForSelector("#calculator-container");
 
-      // console.log(await shadowRoot.$$eval("input", (v) => v.map((v) => v.id)));
-      let inputElement = await page.$(
-        "input#borrowerDtl\\[0\\]\\.borrowerIncomeDtl\\[0\\]\\.amount"
-      );
+  //     // console.log(await shadowRoot.$$eval("input", (v) => v.map((v) => v.id)));
+  //     let inputElement = await page.$(
+  //       "input#borrowerDtl\\[0\\]\\.borrowerIncomeDtl\\[0\\]\\.amount"
+  //     );
 
-      if (inputElement) {
-        await inputElement.click({ clickCount: 3 });
-        await page.keyboard.press("Backspace");
-        await inputElement.type((data.earn / 52).toFixed(3).toString());
-        // console.log(`Entered "amount" into 1000`);
-      }
-      inputElement = await page.$(
-        "input#hasborrowerDtl\\[0\\]\\.borrowerIncomeDtl-no-1"
-      );
+  //     if (inputElement) {
+  //       await inputElement.click({ clickCount: 3 });
+  //       await page.keyboard.press("Backspace");
+  //       await inputElement.type((data.earn / 52).toFixed(3).toString());
+  //       // console.log(`Entered "amount" into 1000`);
+  //     }
+  //     inputElement = await page.$(
+  //       "input#hasborrowerDtl\\[0\\]\\.borrowerIncomeDtl-no-1"
+  //     );
 
-      if (inputElement) {
-        await inputElement.click({ clickCount: 3 });
+  //     if (inputElement) {
+  //       await inputElement.click({ clickCount: 3 });
 
-        // console.log(`Entered "amount" into 1000`);
-      }
+  //       // console.log(`Entered "amount" into 1000`);
+  //     }
 
-      let inputElement2 = await page.$("label[for='borrowType-just-me-0']");
-      // console.log(await inputElement?.$("")); //undefined
+  //     let inputElement2 = await page.$("label[for='borrowType-just-me-0']");
+  //     // console.log(await inputElement?.$("")); //undefined
 
-      if (inputElement2) {
-        await inputElement2.scrollIntoView();
-        await inputElement2.click();
+  //     if (inputElement2) {
+  //       await inputElement2.scrollIntoView();
+  //       await inputElement2.click();
 
-        // console.log(`Entered "amount" into 1000`);
-      }
-      let btn = await page.$("button[type='submit'].boqc-cta.arrow.false");
+  //       // console.log(`Entered "amount" into 1000`);
+  //     }
+  //     let btn = await page.$("button[type='submit'].boqc-cta.arrow.false");
 
-      // console.log(btn);
+  //     // console.log(btn);
 
-      if (btn) {
-        await btn.scrollIntoView();
-        await btn.click();
-      }
-      await page.waitForSelector("#calculator-container");
-      inputElement = await page.$("input#hasDependents-no-1");
-      if (inputElement) {
-        await inputElement.click({ clickCount: 3 });
+  //     if (btn) {
+  //       await btn.scrollIntoView();
+  //       await btn.click();
+  //     }
+  //     await page.waitForSelector("#calculator-container");
+  //     inputElement = await page.$("input#hasDependents-no-1");
+  //     if (inputElement) {
+  //       await inputElement.click({ clickCount: 3 });
 
-        // console.log(`Entered "amount" into 1000`);
-      }
-      let inputElement3 = await page.$(
-        "label[for='hasotherLoanRepayDtl-no-1']"
-      );
-      if (inputElement3) {
-        await inputElement3.click({ clickCount: 3 });
+  //       // console.log(`Entered "amount" into 1000`);
+  //     }
+  //     let inputElement3 = await page.$(
+  //       "label[for='hasotherLoanRepayDtl-no-1']"
+  //     );
+  //     if (inputElement3) {
+  //       await inputElement3.click({ clickCount: 3 });
 
-        // console.log(`Entered "amount" into 1000`);
-      }
-      inputElement3 = await page.$("label[for='hascreditStoreCard-no-1']");
-      if (inputElement3) {
-        await inputElement3.click({ clickCount: 3 });
+  //       // console.log(`Entered "amount" into 1000`);
+  //     }
+  //     inputElement3 = await page.$("label[for='hascreditStoreCard-no-1']");
+  //     if (inputElement3) {
+  //       await inputElement3.click({ clickCount: 3 });
 
-        // console.log(`Entered "amount" into 1000`);
-      }
-      let inputElement4 = await page.$(
-        "input#generalExpenseDtl\\[0\\]\\.amount"
-      );
-      if (inputElement4) {
-        await inputElement4.scrollIntoView();
-        await inputElement4.click({ clickCount: 3 });
-        await page.keyboard.press("Backspace");
-        await inputElement4.type((data.expenses / 4).toFixed(3).toString());
-        // console.log(`Entered "amount" into 1000`);
-      }
-      let btn2 = await page.$("button[type='submit'].boqc-cta.arrow.false");
+  //       // console.log(`Entered "amount" into 1000`);
+  //     }
+  //     let inputElement4 = await page.$(
+  //       "input#generalExpenseDtl\\[0\\]\\.amount"
+  //     );
+  //     if (inputElement4) {
+  //       await inputElement4.scrollIntoView();
+  //       await inputElement4.click({ clickCount: 3 });
+  //       await page.keyboard.press("Backspace");
+  //       await inputElement4.type((data.expenses / 4).toFixed(3).toString());
+  //       // console.log(`Entered "amount" into 1000`);
+  //     }
+  //     let btn2 = await page.$("button[type='submit'].boqc-cta.arrow.false");
 
-      // console.log(btn2);
+  //     // console.log(btn2);
 
-      if (btn2) {
-        await btn2.scrollIntoView();
-        await btn2.click();
-      }
-      await page.waitForSelector(
-        ".calculated-borrowing-power__borrowing-power"
-      );
-      const borrowingAmount = await page.$eval(
-        ".calculated-borrowing-power__borrowing-power",
-        (el) => el.innerHTML
-      );
-      console.log("Final Borrowing Amount:", borrowingAmount);
-      await page.waitForSelector(
-        ".calculated-borrowing-power__borrowing-power"
-      );
-      const borrowingRate = await page.$eval(
-        ".calculated-borrowing-power__interest-rate",
-        (el) => el.innerHTML
-      );
-      console.log("Final Borrowing Amount:", borrowingRate);
-      return borrowingAmount;
-    },
-  });
+  //     if (btn2) {
+  //       await btn2.scrollIntoView();
+  //       await btn2.click();
+  //     }
+  //     await page.waitForSelector(
+  //       ".calculated-borrowing-power__borrowing-power"
+  //     );
+  //     const borrowingAmount = await page.$eval(
+  //       ".calculated-borrowing-power__borrowing-power",
+  //       (el) => el.innerHTML
+  //     );
+  //     console.log("Final Borrowing Amount:", borrowingAmount);
+  //     await page.waitForSelector(
+  //       ".calculated-borrowing-power__borrowing-power"
+  //     );
+  //     const borrowingRate = await page.$eval(
+  //       ".calculated-borrowing-power__interest-rate",
+  //       (el) => el.innerHTML
+  //     );
+  //     console.log("Final Borrowing Amount:", borrowingRate);
+  //     return borrowingAmount;
+  //   },
+  // });
 
   results["westpac"] =
     "$" +
