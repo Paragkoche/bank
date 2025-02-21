@@ -37,7 +37,9 @@ export const getData = async (data: bodyDtoType) => {
     maxConcurrency: 16,
     timeout: 60000,
     puppeteerOptions: {
-      headless: false,
+      executablePath:
+        "/home/azureuser/.cache/puppeteer/chrome/linux-133.0.6943.98/chrome-linux64/chrome",
+      headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
     },
   });
