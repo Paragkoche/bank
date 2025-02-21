@@ -6,8 +6,8 @@ html
 
   body
     .container.mt-5
-      h2.text-center Form Submitted Successfully
-      p.text-center.text-success Your form data has been processed.
+      h2.text-center.text-success Form Submitted Successfully
+      p.text-center Your form data has been processed.
 
       // Display Form Data
       h4 Form Data
@@ -16,11 +16,13 @@ html
           tr
             th Expenses
             th Earn
+            th Borrow
             th Postcode
         tbody
           tr
             td= formData.expenses
             td= formData.earn
+            td= formData.borrow
             td= formData.postcode
 
       // Display Bank Data
@@ -30,12 +32,15 @@ html
           tr
             th Bank
             th Value
+            th DTI
             th Rate
         tbody
           each value, bank in data
             tr
               td= bank
               td= value.value
+              - var dti = (formData.earn != 0) ? (formData.borrow / formData.earn).toFixed(2) : 'N/A'
+              td= dti
               td= value.rate
 
       a.btn.btn-primary.mt-3(href="/") Go Back

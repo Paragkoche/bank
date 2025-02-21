@@ -29,6 +29,7 @@ app.post("/submit", async (req: ExpressRequest, res: any) => {
     expenses: Number(req.body.expenses),
     earn: Number(req.body.earn),
     postcode: Number(req.body.postcode),
+    borrow: Number(req.body.borrow),
   });
 
   if (!result.success) {
