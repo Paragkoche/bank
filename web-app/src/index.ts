@@ -36,7 +36,6 @@ app.post("/submit", async (req: ExpressRequest, res: any) => {
   }
 
   const data = await getData(result.data);
-  console.log(data);
 
   return res.render("table", { data, formData: result.data });
 });

@@ -30,10 +30,12 @@ html
           tr
             th Bank
             th Value
+            th Rate
         tbody
           each value, bank in data
             tr
               td= bank
-              td= value
+              td= value.value
+              td= value.rate
 
       a.btn.btn-primary.mt-3(href="/") Go Back
