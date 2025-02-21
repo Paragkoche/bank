@@ -75,11 +75,10 @@ export const getData = async (data: bodyDtoType) => {
   const cluster = await Cluster.launch({
     concurrency: Cluster.CONCURRENCY_CONTEXT,
     maxConcurrency: 16,
-    timeout: 60000,
     puppeteerOptions: {
-      // executablePath:
-      //   "/home/azureuser/.cache/puppeteer/chrome/linux-133.0.6943.98/chrome-linux64/chrome",
-      headless: false,
+      executablePath:
+        "/home/azureuser/.cache/puppeteer/chrome/linux-133.0.6943.98/chrome-linux64/chrome",
+      headless: true,
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
     },
   });
