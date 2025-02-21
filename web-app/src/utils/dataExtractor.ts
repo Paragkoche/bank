@@ -31,15 +31,55 @@ const apiCall = async (data: bodyDtoType) => {
     },
   });
 };
+
+const apiCall2 = async (data: bodyDtoType) => {
+  let json = JSON.stringify({
+    Applicants: [
+      {
+        BaseIncome: {
+          Amount: data.earn,
+          Frequency: "ANNUALLY",
+        },
+        BonusOvertimeCommIncome: null,
+        RentalIncome: null,
+        OtherIncome: null,
+        Primary: true,
+      },
+    ],
+    Expense: {
+      Living: {
+        Amount: data.expenses,
+        Frequency: "MONTHLY",
+      },
+      Rental: null,
+    },
+    NumOfDependants: 0,
+    PropertyType: "OWNER_OCCUPIED",
+    PostSettlementPostcode: data.postcode.toString(),
+    LoanAmount: 0,
+    PropertyValue: data.earn,
+  });
+
+  let config = {
+    method: "post",
+    maxBodyLength: Infinity,
+    url: "https://www.ing.com.au/api/BorrowPowerCalc/Service/BorrowPowerCalcService.svc/json/BorrowPowerCalc/BorrowPowerCalc",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    data: json,
+  };
+  return await axios.request(config);
+};
 export const getData = async (data: bodyDtoType) => {
   const cluster = await Cluster.launch({
     concurrency: Cluster.CONCURRENCY_CONTEXT,
     maxConcurrency: 16,
     timeout: 60000,
     puppeteerOptions: {
-      executablePath:
-        "/home/azureuser/.cache/puppeteer/chrome/linux-133.0.6943.98/chrome-linux64/chrome",
-      headless: true,
+      // executablePath:
+      //   "/home/azureuser/.cache/puppeteer/chrome/linux-133.0.6943.98/chrome-linux64/chrome",
+      headless: false,
       args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-gpu"],
     },
   });
@@ -107,7 +147,7 @@ export const getData = async (data: bodyDtoType) => {
         "#borrowResultTextAmount",
         (el) => el.textContent?.trim() ?? ""
       );
-      console.log("Final Borrowing Amount (anz):", amount);
+      // console.log("Final Borrowing Amount (anz):", amount);
 
       return {
         value: formatter.format(convertCurrencyToNumber(amount)),
@@ -250,7 +290,7 @@ export const getData = async (data: bodyDtoType) => {
         (el) => el.textContent
       );
       const rate = `Principal & interest rate ${ds!} and comparison rate ${s!}`;
-      console.log("Final Borrowing Amount:", borrowingAmount);
+      // console.log("Final Borrowing Amount:", borrowingAmount);
       return {
         value: formatter.format(convertCurrencyToNumber(borrowingAmount)),
         rate: rate,
@@ -351,7 +391,7 @@ export const getData = async (data: bodyDtoType) => {
         ".calculated-borrowing-power__borrowing-power",
         (el) => el.innerHTML
       );
-      console.log("Final Borrowing Amount:", borrowingAmount);
+      // console.log("Final Borrowing Amount:", borrowingAmount);
       await page.waitForSelector(
         ".calculated-borrowing-power__borrowing-power"
       );
@@ -359,7 +399,7 @@ export const getData = async (data: bodyDtoType) => {
         ".calculated-borrowing-power__info",
         (el) => el.textContent
       );
-      console.log("Final Borrowing Amount:", borrowingRate);
+      // console.log("Final Borrowing Amount:", borrowingRate);
       return {
         value: formatter.format(convertCurrencyToNumber(borrowingAmount)),
         rate: borrowingRate,
@@ -376,6 +416,19 @@ export const getData = async (data: bodyDtoType) => {
       apiD.data.data.serviceability.assessmentRate +
       "% p.a",
   };
+  apiD = await apiCall2(data);
+  results["ing"] = {
+    value: apiD.data.Result
+      ? formatter.format(apiD.data.Response.BorrowAmount)
+      : "Not estimate available",
+    rate: apiD.data.Result
+      ? "CompInterest Rate " +
+        apiD.data.Response.Repayment.CompInterestRate +
+        "% p.a Interest Rate " +
+        apiD.data.Response.Repayment.InterestRate +
+        "% p.a"
+      : "Not estimate available",
+  };
 
   cluster.queue({
     url: "https://online.macquarie.com.au/originations/borrowing-power/calculate",
@@ -383,9 +436,9 @@ export const getData = async (data: bodyDtoType) => {
     bank: "macquarie",
     stepper: true,
     async getData(page: Page) {
-      console.log(
-        "====================================================BOQ====================================================================="
-      );
+      // console.log(
+      //   "====================================================BOQ====================================================================="
+      // );
 
       await page.waitForSelector("app-calculate-form-details");
 
@@ -425,7 +478,7 @@ export const getData = async (data: bodyDtoType) => {
       if (inputElementI) {
         await inputElementI.click({ clickCount: 3 });
         await page.keyboard.press("Backspace");
-        await inputElementI.type("1");
+        await inputElementI.type("0");
       }
       await page.waitForSelector(
         'mq-button-group[data-testid="repaymentType"]',
@@ -447,7 +500,7 @@ export const getData = async (data: bodyDtoType) => {
       if (inputElementE) {
         await inputElementE.click({ clickCount: 3 });
         await page.keyboard.press("Backspace");
-        await inputElementE.type("100000");
+        await inputElementE.type(data.earn.toString());
       }
       await page.waitForSelector(
         "mq-numeric-input[data-testid='Total living expenses']"
@@ -458,7 +511,7 @@ export const getData = async (data: bodyDtoType) => {
       if (inputElementX) {
         await inputElementX.click({ clickCount: 3 });
         await page.keyboard.press("Backspace");
-        await inputElementX.type("500");
+        await inputElementX.type(data.expenses.toString());
       }
       const btn = await page.$(`.borrowing__one-button-footer button`);
       if (btn) {
@@ -509,6 +562,72 @@ export const getData = async (data: bodyDtoType) => {
       );
 
       return { value, rate };
+    },
+  });
+  await cluster.queue({
+    url: "https://d199to9k0kd0mu.cloudfront.net/borrowing-power-v2/wiwo-borrowing-power/clients/amp/index.html?frameId=wiwo-tzububi&hostUrl=https%3A%2F%2Fwww.amp.com.au%2Fhome-loans%2Fcalculators%2Fborrowing-power-calculator&configUrl=%2Fborrowing-power-v2%2Fconfig%2Fwiwo-borrowing-power-config.json#!/start",
+    waitSelector: "bp-route-main-view[rpy-view-model='repaymentViewModel']",
+    stepper: true,
+    bank: "amp",
+    async getData(page: Page) {
+      await page.waitForSelector("div[ui-view='app-content']");
+      let single = await page.$("input[ng-value='wiwoRadioItem']");
+      if (single) {
+        await single.scrollIntoView();
+        await single.click();
+        // console.log("Single Clicked");
+      }
+      await page.waitForSelector("select[ng-model='$ctrl.modelField']", {
+        visible: true,
+      });
+
+      await page.select("select[ng-model='$ctrl.modelField']", "object:58");
+      // console.log("Selected 58");
+      let income = await page.$(
+        ".currency-slider__result.wiwo-slider__input.ww-input-group input[ng-model='$ctrl.modelField']"
+      );
+      if (income) {
+        await income.click({ clickCount: 3 });
+        await page.keyboard.press("Backspace");
+        await income.type("50000");
+        // console.log("Entered Income");
+      }
+      let tabExp = await page.$(".uib-tab--expenses");
+      if (tabExp) {
+        await tabExp.click();
+        // console.log("Clicked Expenses");
+      }
+      await page.waitForSelector(
+        "items-single[expense-model='$ctrl.livingExpenseModel']"
+      );
+      let expenses = await page.$(
+        "items-single[expense-model='$ctrl.livingExpenseModel'] input"
+      );
+      if (expenses) {
+        await expenses.click({ clickCount: 3 });
+        await page.keyboard.press("Backspace");
+        await expenses.type("500");
+        // console.log("Entered Expenses");
+      }
+      let tabResalt = await page.$(".uib-tab--results");
+      if (tabResalt) {
+        await tabResalt.click();
+        // console.log("Clicked Results");
+      }
+      const borrowingAmount =
+        (await page.$eval(".bp-result--primary", (el) => el.textContent)) ?? "";
+
+      const rate = await page.$eval(".result-line--rate0", (el) =>
+        el.textContent?.trim().replace(/\s+/g, " ")
+      );
+
+      const rate2 = await page.$eval(".result-line--comparison-rate", (el) =>
+        el.textContent?.trim().replace(/\s+/g, " ")
+      );
+      return {
+        value: formatter.format(convertCurrencyToNumber(borrowingAmount)),
+        rate: `Principal & interest rate ${rate} and comparison rate ${rate2}`,
+      };
     },
   });
 
